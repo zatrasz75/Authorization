@@ -5,6 +5,7 @@ import (
 	"authorization/pkg/middl"
 	"authorization/pkg/storage"
 	"authorization/pkg/storage/redisDB"
+	"flag"
 	"log"
 	"net/http"
 )
@@ -15,7 +16,16 @@ type server struct {
 	api *api.API
 }
 
+const (
+	authorizationPort = ":4000"
+)
+
 func main() {
+
+	// Можно сменить Порт при запуске флагом < --port-authorization= >
+	portFlag := flag.String("port-authorization", authorizationPort, "Порт для authorization сервиса")
+	flag.Parse()
+	PORT := *portFlag
 
 	// объект сервера
 	var srv server
@@ -35,9 +45,9 @@ func main() {
 
 	srv.api.Router().Use(middl.Middle)
 
-	log.Println("Запуск сервера на http://127.0.0.1:4000/login")
+	log.Println("Запуск сервера на http://127.0.0.1" + PORT + "/login")
 
-	err = http.ListenAndServe(":4000", srv.api.Router())
+	err = http.ListenAndServe(PORT, srv.api.Router())
 	if err != nil {
 		log.Fatal("Не удалось запустить сервер шлюза. Error:", err)
 	}

@@ -11,42 +11,67 @@ const (
 	minLength = 8
 )
 
-// CheckPassword Функция для проверки валидности пароля
-func CheckPassword(password string) bool {
-
-	// Проверяем, что пароль имеет длину не менее 8 символов
-	lenRegex := regexp.MustCompile(fmt.Sprintf(`^.{%d,}$`, minLength))
-	if !lenRegex.MatchString(password) {
-		log.Printf("Ошибка! Длина пароля менее %d\n", minLength)
+// CheckEmail Функция для проверки валидности адреса электронной почты
+func CheckEmail(email string) bool {
+	// Регулярное выражение для проверки адреса электронной почты
+	regex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !regex.MatchString(email) {
+		log.Println("Не корректный адрес")
 		return false
 	}
+	return true
+}
 
-	// Проверяем, что пароль содержит хотя бы одну цифру
-	if !regexp.MustCompile(`[0-9]+`).MatchString(password) {
-		log.Println("Ошибка! Пароль должен содержать цифры")
-		return false
-	}
-
-	// Проверяем, что пароль содержит хотя бы одну заглавную букву
-	if !regexp.MustCompile(`[A-Z]+`).MatchString(password) {
-		log.Println("Ошибка! Пароль должен содержать прописные буквы")
-		return false
-	}
-
-	// Проверяем, что пароль содержит хотя бы одну строчную букву
+// LowercaseLetter Проверяем, что пароль содержит хотя бы одну строчную букву
+func LowercaseLetter(password string) bool {
 	if !regexp.MustCompile(`[a-z]+`).MatchString(password) {
 		log.Println("Ошибка! Пароль должен содержать строчные буквы")
 		return false
 	}
+	return true
+}
 
-	// Проверяем что пароль должен содержать спец.символ
+// SpecCharRegex Проверяем что пароль должен содержать спец. Символ
+func SpecCharRegex(password string) bool {
 	specCharRegex := regexp.MustCompile(`[!@#$%^&*()\-=+,./\\_]+`)
 	if !specCharRegex.MatchString(password) {
 		log.Println("Ошибка! Пароль должен содержать спец.символ")
 		return false
 	}
+	return true
+}
 
-	// Проверяем что пароль не слабый
+// LenPass Проверяем, что пароль имеет длину не менее 8 символов
+func LenPass(password string) bool {
+	lenRegex := regexp.MustCompile(fmt.Sprintf(`^.{%d,}$`, minLength))
+	if !lenRegex.MatchString(password) {
+		log.Printf("Ошибка! Длина пароля менее %d\n", minLength)
+		return false
+	}
+	return true
+}
+
+// NumbersPass Проверяем, что пароль содержит хотя бы одну цифру
+func NumbersPass(password string) bool {
+	if !regexp.MustCompile(`[0-9]+`).MatchString(password) {
+		log.Println("Ошибка! Пароль должен содержать цифры")
+		return false
+	}
+	return true
+}
+
+// ContainPass Проверяем, что пароль содержит хотя бы одну заглавную букву
+func ContainPass(password string) bool {
+	if !regexp.MustCompile(`[A-Z]+`).MatchString(password) {
+		log.Println("Ошибка! Пароль должен содержать прописные буквы")
+		return false
+	}
+	return true
+}
+
+// WeakPass Проверяем что пароль не слабый
+func WeakPass(password string) bool {
+
 	mostPopularPassword := []string{
 		"Qq123456",
 		"Qwerty123",
@@ -58,16 +83,5 @@ func CheckPassword(password string) bool {
 		return false
 	}
 
-	return true
-}
-
-// CheckEmail Функция для проверки валидности адреса электронной почты
-func CheckEmail(email string) bool {
-	// Регулярное выражение для проверки адреса электронной почты
-	regex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	if !regex.MatchString(email) {
-		log.Println("Не корректный адрес")
-		return false
-	}
 	return true
 }

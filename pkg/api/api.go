@@ -54,7 +54,12 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Каналы для синхронизации и передачи результатов проверок
 	emailResultCh := make(chan bool)
-	passResultCh := make(chan bool)
+	letterCh := make(chan bool)
+	specCharCh := make(chan bool)
+	lenRegexCh := make(chan bool)
+	numbersCh := make(chan bool)
+	containLetterCh := make(chan bool)
+	weakCh := make(chan bool)
 
 	// Горутина для проверки адреса электронной почты
 	go func() {
@@ -62,46 +67,81 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	// Горутина для проверки пароля
 	go func() {
-		passResultCh <- check.CheckPassword(password)
+		letterCh <- check.LowercaseLetter(password)
+	}()
+	go func() {
+		specCharCh <- check.SpecCharRegex(password)
+	}()
+	go func() {
+		lenRegexCh <- check.LenPass(password)
+	}()
+	go func() {
+		numbersCh <- check.NumbersPass(password)
+	}()
+	go func() {
+		containLetterCh <- check.ContainPass(password)
+	}()
+	go func() {
+		weakCh <- check.WeakPass(password)
 	}()
 
 	// Ожидание результатов проверок
 	emailValid := <-emailResultCh
-	passValid := <-passResultCh
+	letterValid := <-letterCh
+	specValid := <-specCharCh
+	lenValid := <-lenRegexCh
+	numbersValid := <-numbersCh
+	containValid := <-containLetterCh
+	weakValid := <-weakCh
 
 	// Проверка результатов
 	if !emailValid {
 		fmt.Fprintf(w, "Адрес электронной почты не корректный\n")
 		return
 	}
-	if !passValid {
-		fmt.Fprintf(w, "Пароль не корректный\n")
-		return
+	if !letterValid {
+		fmt.Fprintf(w, "Ошибка! Пароль должен содержать строчные буквы\n")
+	}
+	if !specValid {
+		fmt.Fprintf(w, "Ошибка! Пароль должен содержать спец.символ\n")
+	}
+	if !lenValid {
+		fmt.Fprintf(w, "Ошибка! Пароль должен содержать не менее 8 символов\n")
+	}
+	if !numbersValid {
+		fmt.Fprintf(w, "Ошибка! Пароль должен содержать цифры\n")
+	}
+	if !containValid {
+		fmt.Fprintf(w, "Ошибка! Пароль должен содержать прописные буквы\n")
+	}
+	if !weakValid {
+		fmt.Fprintf(w, "Предупреждение! Очень слабый пароль, придумайте другой\n")
 	}
 
 	// Адрес электронной почты и пароль валидны
-	c := storage.Account{
-		Username: username,
-		Password: password,
-	}
+	if emailValid && letterValid && specValid && lenValid && numbersValid && containValid && weakValid {
+		// Адрес электронной почты и пароль валидны
+		c := storage.Account{
+			Username: username,
+			Password: password,
+		}
 
-	// Проверяем есть ли такой пользователь в базе redis
-	keys, err := api.db.KeysAccount(c)
-	if err != nil {
-		log.Println(err)
+		// Проверяем есть ли такой пользователь в базе redis
+		keys, err := api.db.KeysAccount(c)
+		if err != nil {
+			log.Println(err)
+		}
+		if keys == true {
+			//  Если такой пользователь существует, отображаем сообщение об ошибке.
+			fmt.Fprintf(w, "Такой пользователь уже существует")
+			return
+		}
+		err = api.db.AddAccount(c)
+		if err != nil {
+			log.Println(err)
+		}
+		http.Redirect(w, r, "/login", http.StatusFound)
 	}
-	if keys == true {
-		//  Если такой пользователь существует, отображаем сообщение об ошибке.
-		fmt.Fprintf(w, "Такой пользователь уже существует")
-		return
-	}
-
-	err = api.db.AddAccount(c)
-	if err != nil {
-		log.Println(err)
-	}
-	// Если зарегистрировались перенаправляем пользователя на страницу с авторизацией
-	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 // Функция-обработчик для страницы с авторизацией
