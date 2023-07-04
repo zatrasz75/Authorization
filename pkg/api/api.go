@@ -5,6 +5,7 @@ import (
 	"authorization/pkg/storage"
 	"fmt"
 	"github.com/gorilla/mux"
+	"html/template"
 	"log"
 	"net/http"
 )
@@ -33,13 +34,45 @@ func (api *API) Router() *mux.Router {
 
 // Регистрация обработчиков API.
 func (api *API) endpoints() {
-
+	api.r.HandleFunc("/", api.home).Methods(http.MethodGet)
 	api.r.HandleFunc("/login", api.loginHandler).Methods(http.MethodPost)
 	api.r.HandleFunc("/dashboard", api.dashboardHandler).Methods(http.MethodGet)
 	api.r.HandleFunc("/registration", api.registrationHandler).Methods(http.MethodPost)
 	api.r.HandleFunc("/delaccount", api.delAccountHandler).Methods(http.MethodPost)
 	// веб-приложение
 	api.r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", http.FileServer(http.Dir("./cmd/web"))))
+
+}
+
+func (api *API) home(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Определение данных для передачи в шаблон
+	data := struct {
+		Title string
+		Text  string
+	}{
+		Title: "Форма авторизации",
+		Text:  "Ups",
+	}
+
+	// Загрузка и компиляция шаблона
+	tmpl, err := template.ParseFiles("./cmd/web/index.html")
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Ошибка открытия файла", http.StatusInternalServerError)
+		return
+	}
+
+	// Рендеринг шаблона с передачей данных
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Ошибка сервера", http.StatusInternalServerError)
+		return
+	}
 
 }
 
@@ -120,10 +153,11 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Адрес электронной почты и пароль валидны
 	if emailValid && letterValid && specValid && lenValid && numbersValid && containValid && weakValid {
+		hash := check.HashPass(password)
 		// Адрес электронной почты и пароль валидны
 		c := storage.Account{
 			Username: username,
-			Password: password,
+			Password: hash,
 		}
 
 		// Проверяем есть ли такой пользователь в базе redis
@@ -140,6 +174,7 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println(err)
 		}
+		fmt.Fprintf(w, "Ваш аккаунт успешно создан.")
 		http.Redirect(w, r, "/login", http.StatusFound)
 	}
 }
@@ -149,10 +184,15 @@ func (api *API) loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/login" {
 		http.NotFound(w, r)
 	}
-	// Получаем данные из формы входа
+	// Получаем данные из формы регистрации
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	hash := check.HashPass(password)
+
 	c := storage.Account{
-		Username: r.FormValue("username"),
-		Password: r.FormValue("password"),
+		Username: username,
+		Password: hash,
 	}
 
 	// Получаем пароль из базы данных
@@ -202,7 +242,6 @@ func (api *API) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Добро пожаловать в панель управления!")
 }
 
-// Удаляем аккаунт
 func (api *API) delAccountHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/delaccount" {
 		http.NotFound(w, r)

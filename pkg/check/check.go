@@ -1,6 +1,8 @@
 package check
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"regexp"
@@ -84,4 +86,21 @@ func WeakPass(password string) bool {
 	}
 
 	return true
+}
+
+// HashPass Хеширование пароля.
+func HashPass(password string) string {
+	// Создание нового объекта хэша SHA-256
+	hash := sha256.New()
+
+	// Запись данных в хэш-функцию
+	hash.Write([]byte(password))
+
+	// Получение окончательного хэш-значения в виде среза байт
+	hashBytes := hash.Sum(nil)
+
+	// Преобразование хэш-значения в строку в шестнадцатеричном формате
+	hashString := hex.EncodeToString(hashBytes)
+
+	return hashString
 }
