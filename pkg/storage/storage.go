@@ -10,4 +10,5 @@ type Interface interface {
 	SearchAccount(c Account) (string, error)
 	KeysAccount(c Account) (bool, error)
 	DelAccount(c Account) (bool, error)
+	//DropAccountsTable(c Account) error
 }

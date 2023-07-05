@@ -52,7 +52,7 @@ func (s Storage) SearchAccount(c Interface.Account) (result string, err error) {
 	return result, err
 }
 
-// KeysAccount Назодит логин по ключу в базе redis
+// KeysAccount Проверяет логин по ключу в базе redis
 func (s Storage) KeysAccount(c Interface.Account) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -73,6 +73,7 @@ func (s Storage) KeysAccount(c Interface.Account) (bool, error) {
 	return false, nil
 }
 
+// DelAccount Удаляет аккаунт в базе Redis
 func (s Storage) DelAccount(c Interface.Account) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()

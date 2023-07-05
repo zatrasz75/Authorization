@@ -1,7 +1,23 @@
 # Authorization
 
-### запустить приложение:
+### запустить приложение с переменными окружения по умолчанию:
 * go run cmd/main.go
+
+### изменить переменные через аргументы командной строки при запуске:
+host
+* go run cmd/main.go --host-authorization= < >
+
+port
+* go run cmd/main.go --port-authorization= < >
+
+Redis URL
+* go run cmd/main.go --rdis-url-authorization= < >
+
+Postgres URL
+* go run cmd/main.go --postgres-url-authorization= < >
+
+### Или в файле .env
+* APP_HOST , APP_PORT , DB_REDIS_URL , DB_POSTGRES_URL
 
 ### Доступные API для работы с базой данных Redis, примеры:
 
