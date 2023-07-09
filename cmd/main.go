@@ -29,7 +29,7 @@ func init() {
 
 // Переменные для окружения соединения
 const (
-	authorizationPort = ":4000"
+	authorizationPort = "4000"
 	authorizationHost = "127.0.0.1"
 	clientRedisDB     = "redis://localhost:6379"
 	clientPostgresDB  = "postgres://postgres:rootroot@localhost:5432/Account"
@@ -84,7 +84,7 @@ func main() {
 	_, _ = dbR, dbP
 
 	// Инициализируем хранилище сервера конкретной БД.
-	srv.db = dbP
+	srv.db = dbR
 
 	if srv.db == dbP {
 		err = dbP.DropAccountsTable()
@@ -103,9 +103,9 @@ func main() {
 
 	srv.api.Router().Use(middl.Middle)
 
-	log.Println("Запуск сервера на ", "http://"+HOST+PORT+"/login")
+	log.Println("Запуск сервера на ", "http://"+HOST+":"+PORT+"/login")
 
-	err = http.ListenAndServe(HOST+PORT, srv.api.Router())
+	err = http.ListenAndServe(HOST+":"+PORT, srv.api.Router())
 	if err != nil {
 		log.Fatal("Не удалось запустить сервер шлюза. Error:", err)
 	}

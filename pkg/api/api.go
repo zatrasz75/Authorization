@@ -8,6 +8,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
+	"sync"
 )
 
 // API приложения.
@@ -40,7 +42,7 @@ func (api *API) endpoints() {
 	api.r.HandleFunc("/registration", api.registrationHandler).Methods(http.MethodPost)
 	api.r.HandleFunc("/delaccount", api.delAccountHandler).Methods(http.MethodPost)
 	// веб-приложение
-	api.r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", http.FileServer(http.Dir("./cmd/web"))))
+	api.r.PathPrefix("/").Handler(http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
 
 }
 
@@ -50,21 +52,21 @@ func (api *API) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Загрузка и компиляция шаблона
+	tmpl, err := template.ParseFiles("./web/template/index.html")
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Ошибка открытия файла", http.StatusInternalServerError)
+		return
+	}
+
 	// Определение данных для передачи в шаблон
 	data := struct {
 		Title string
 		Text  string
 	}{
 		Title: "Форма авторизации",
-		Text:  "Ups",
-	}
-
-	// Загрузка и компиляция шаблона
-	tmpl, err := template.ParseFiles("./cmd/web/index.html")
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "Ошибка открытия файла", http.StatusInternalServerError)
-		return
+		Text:  "Привет!",
 	}
 
 	// Рендеринг шаблона с передачей данных
@@ -73,7 +75,6 @@ func (api *API) home(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Ошибка сервера", http.StatusInternalServerError)
 		return
 	}
-
 }
 
 // Функция-обработчик для страницы с регистрацией
@@ -86,97 +87,104 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	// Каналы для синхронизации и передачи результатов проверок
-	emailResultCh := make(chan bool)
-	letterCh := make(chan bool)
-	specCharCh := make(chan bool)
-	lenRegexCh := make(chan bool)
-	numbersCh := make(chan bool)
-	containLetterCh := make(chan bool)
-	weakCh := make(chan bool)
+	emailResultCh := make(chan bool, 1)
+	letterCh := make(chan bool, 1)
+	specCharCh := make(chan bool, 1)
+	lenRegexCh := make(chan bool, 1)
+	numbersCh := make(chan bool, 1)
+	containLetterCh := make(chan bool, 1)
+	weakCh := make(chan bool, 1)
+
+	var wg sync.WaitGroup
+	wg.Add(7) // Устанавливаем количество ожидаемых горутин
 
 	// Горутина для проверки адреса электронной почты
 	go func() {
+		defer wg.Done()
 		emailResultCh <- check.CheckEmail(username)
 	}()
-	// Горутина для проверки пароля
+	// Горутины для проверки пароля
 	go func() {
+		defer wg.Done()
 		letterCh <- check.LowercaseLetter(password)
 	}()
 	go func() {
+		defer wg.Done()
 		specCharCh <- check.SpecCharRegex(password)
 	}()
 	go func() {
+		defer wg.Done()
 		lenRegexCh <- check.LenPass(password)
 	}()
 	go func() {
+		defer wg.Done()
 		numbersCh <- check.NumbersPass(password)
 	}()
 	go func() {
+		defer wg.Done()
 		containLetterCh <- check.ContainPass(password)
 	}()
 	go func() {
+		defer wg.Done()
 		weakCh <- check.WeakPass(password)
 	}()
+	wg.Wait()
 
-	// Ожидание результатов проверок
-	emailValid := <-emailResultCh
-	letterValid := <-letterCh
-	specValid := <-specCharCh
-	lenValid := <-lenRegexCh
-	numbersValid := <-numbersCh
-	containValid := <-containLetterCh
-	weakValid := <-weakCh
+	var errorMessages []string
 
-	// Проверка результатов
-	if !emailValid {
-		fmt.Fprintf(w, "Адрес электронной почты не корректный\n")
+	if !<-emailResultCh {
+		errorMessages = append(errorMessages, "Адрес электронной почты не корректный")
+	}
+	if !<-letterCh {
+		errorMessages = append(errorMessages, "Ошибка! Пароль должен содержать строчные буквы")
+	}
+	if !<-specCharCh {
+		errorMessages = append(errorMessages, "Ошибка! Пароль должен содержать спец. символ")
+	}
+	if !<-lenRegexCh {
+		errorMessages = append(errorMessages, "Ошибка! Пароль должен содержать не менее 8 символов")
+	}
+	if !<-numbersCh {
+		errorMessages = append(errorMessages, "Ошибка! Пароль должен содержать цифры")
+	}
+	if !<-containLetterCh {
+		errorMessages = append(errorMessages, "Ошибка! Пароль должен содержать прописные буквы")
+	}
+	if !<-weakCh {
+		errorMessages = append(errorMessages, "Предупреждение! Очень слабый пароль, придумайте другой")
+	}
+
+	// Вывод ошибок, если они есть
+	if len(errorMessages) > 0 {
+		errorMsg := strings.Join(errorMessages, "\n")
+		fmt.Fprintf(w, "%s\n", errorMsg)
 		return
-	}
-	if !letterValid {
-		fmt.Fprintf(w, "Ошибка! Пароль должен содержать строчные буквы\n")
-	}
-	if !specValid {
-		fmt.Fprintf(w, "Ошибка! Пароль должен содержать спец.символ\n")
-	}
-	if !lenValid {
-		fmt.Fprintf(w, "Ошибка! Пароль должен содержать не менее 8 символов\n")
-	}
-	if !numbersValid {
-		fmt.Fprintf(w, "Ошибка! Пароль должен содержать цифры\n")
-	}
-	if !containValid {
-		fmt.Fprintf(w, "Ошибка! Пароль должен содержать прописные буквы\n")
-	}
-	if !weakValid {
-		fmt.Fprintf(w, "Предупреждение! Очень слабый пароль, придумайте другой\n")
 	}
 
 	// Адрес электронной почты и пароль валидны
-	if emailValid && letterValid && specValid && lenValid && numbersValid && containValid && weakValid {
-		hash := check.HashPass(password)
-		// Адрес электронной почты и пароль валидны
-		c := storage.Account{
-			Username: username,
-			Password: hash,
-		}
-
-		// Проверяем есть ли такой пользователь в базе redis
-		keys, err := api.db.KeysAccount(c)
-		if err != nil {
-			log.Println(err)
-		}
-		if keys == true {
-			//  Если такой пользователь существует, отображаем сообщение об ошибке.
-			fmt.Fprintf(w, "Такой пользователь уже существует")
-			return
-		}
-		err = api.db.AddAccount(c)
-		if err != nil {
-			log.Println(err)
-		}
-		fmt.Fprintf(w, "Ваш аккаунт успешно создан.")
-		http.Redirect(w, r, "/login", http.StatusFound)
+	hash := check.HashPass(password)
+	c := storage.Account{
+		Username: username,
+		Password: hash,
 	}
+
+	// Проверяем есть ли такой пользователь в базе redis
+	keys, err := api.db.KeysAccount(c)
+	if err != nil {
+		log.Println(err)
+	}
+	if keys == true {
+		//  Если такой пользователь существует, отображаем сообщение об ошибке.
+		fmt.Fprintf(w, "Такой пользователь уже существует")
+		return
+	}
+	err = api.db.AddAccount(c)
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Fprintf(w, "Ваш аккаунт успешно создан.")
+	http.Redirect(w, r, "/login", http.StatusFound)
+
 }
 
 // Функция-обработчик для страницы с авторизацией

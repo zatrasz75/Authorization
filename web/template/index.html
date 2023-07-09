@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{{ .Title}}</title>
+</head>
+<body>
+<h2>Форма авторизации</h2>
+<form action="/login" method="post">
+    <div>
+        <label for="username">Имя пользователя: {{ .Text}}</label>
+        <input type="text" id="username" name="username" required>
+    </div>
+    <div>
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" required>
+    </div>
+    <div>
+        <input type="submit" value="Войти">
+    </div>
+</form>
+</body>
+</html>
