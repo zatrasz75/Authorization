@@ -65,7 +65,6 @@ func (s Storage) KeysAccount(c Interface.Account) (bool, error) {
 
 	// Обработка найденных ключей
 	for _, k := range key {
-		log.Println(k)
 		if c.Username == k {
 			return true, nil
 		}

@@ -16,8 +16,11 @@ Redis URL
 Postgres URL
 * go run cmd/main.go --postgres-url-authorization= < >
 
+Mongo URL
+* go run cmd/main.go --mongo-url-authorization= < >
+
 ### Или в файле .env
-* APP_HOST , APP_PORT , DB_REDIS_URL , DB_POSTGRES_URL
+* APP_HOST , APP_PORT , DB_REDIS_URL , DB_POSTGRES_URL , DB_MONGO_URL
 
 ### Доступные API для работы с базой данных Redis, примеры:
 

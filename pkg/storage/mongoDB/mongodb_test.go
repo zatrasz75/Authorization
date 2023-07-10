@@ -1,4 +1,4 @@
-package postgres
+package mongoDB
 
 import (
 	"authorization/pkg/storage"
@@ -6,19 +6,20 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	s, err := New("postgres://postgres:rootroot@localhost:5432/Account")
+	s, err := New("mongodb://localhost:27015/")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Проверка, что клиент postgres был успешно инициализирован
+
+	// Проверка, что клиент MongoDB был успешно инициализирован
 	if s.db == nil {
-		t.Error("Клиент Postgres не был инициализирован")
+		t.Error("Клиент MongoDB не был инициализирован")
 	}
 }
 
-func TestStore_AddAccount(t *testing.T) {
-	// Установка соединения с базой данных PostgreSQL
-	dataBase, err := New("postgres://postgres:rootroot@localhost:5432/Account")
+func TestStorage_AddAccount(t *testing.T) {
+	// Установка соединения с базой данных MongoDB
+	dataBase, err := New("mongodb://localhost:27015/")
 	if err != nil {
 		t.Fatalf("не удалось подключиться к базе данных: %v", err)
 	}
@@ -36,9 +37,9 @@ func TestStore_AddAccount(t *testing.T) {
 	t.Log("Запись создана.")
 }
 
-func TestStore_SearchAccount(t *testing.T) {
-	// Установка соединения с базой данных PostgreSQL
-	dataBase, err := New("postgres://postgres:rootroot@localhost:5432/Account")
+func TestStorage_SearchAccount(t *testing.T) {
+	// Установка соединения с базой данных MongoDB
+	dataBase, err := New("mongodb://localhost:27015/")
 	if err != nil {
 		t.Fatalf("не удалось подключиться к базе данных: %v", err)
 	}
@@ -62,9 +63,9 @@ func TestStore_SearchAccount(t *testing.T) {
 	}
 }
 
-func TestStore_KeysAccount(t *testing.T) {
-	// Установка соединения с базой данных PostgreSQL
-	dataBase, err := New("postgres://postgres:rootroot@localhost:5432/Account")
+func TestStorage_KeysAccount(t *testing.T) {
+	// Установка соединения с базой данных MongoDB
+	dataBase, err := New("mongodb://localhost:27015/")
 	if err != nil {
 		t.Fatalf("не удалось подключиться к базе данных: %v", err)
 	}
@@ -87,9 +88,9 @@ func TestStore_KeysAccount(t *testing.T) {
 	}
 }
 
-func TestStore_DelAccount(t *testing.T) {
-	// Установка соединения с базой данных PostgreSQL
-	dataBase, err := New("postgres://postgres:rootroot@localhost:5432/Account")
+func TestStorage_DelAccount(t *testing.T) {
+	// Установка соединения с базой данных MongoDB
+	dataBase, err := New("mongodb://localhost:27015/")
 	if err != nil {
 		t.Fatalf("не удалось подключиться к базе данных: %v", err)
 	}
@@ -107,7 +108,9 @@ func TestStore_DelAccount(t *testing.T) {
 	}
 
 	// Проверка результата удаления аккаунта
+	//expectedDeleted := true // Замените на ожидаемое значение
 	if deleted != true {
 		t.Errorf("неправильный результат удаления аккаунта. Получено: %v, Ожидается: %v", deleted, true)
 	}
+
 }

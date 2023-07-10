@@ -2,16 +2,12 @@ package redisDB
 
 import (
 	"authorization/pkg/storage"
-	"context"
 	"testing"
-	"time"
 )
 
 func TestNew(t *testing.T) {
-	constr := "redis://localhost:6379"
-
 	// Проверка ошибок
-	s, err := New(constr)
+	s, err := New("redis://localhost:6379")
 	if err != nil {
 		t.Fatalf("Ошибка при создании экземпляра Storage: %v", err)
 	}
@@ -23,36 +19,97 @@ func TestNew(t *testing.T) {
 }
 
 func TestStorage_AddAccount(t *testing.T) {
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	// Подготовка тестовых данных
-	username := "testusers"
-	password := "Test123!"
-	account := storage.Account{
-		Username: username,
-		Password: password,
-	}
-
-	// Создание тестового экземпляра Storage
-	storage, err := New("redis://localhost:6379")
+	// Установка соединения с базой данных RedisDB
+	dataBase, err := New("redis://localhost:6379")
 	if err != nil {
-		t.Fatalf("Ошибка при создании экземпляра Storage: %v", err)
+		t.Fatalf("не удалось подключиться к базе данных: %v", err)
 	}
-
+	// Определение тестового аккаунта
+	c := storage.Account{
+		Username: "krex@ya.ru",
+		Password: "12345678",
+	}
 	// Вызов функции AddAccount
-	err = storage.AddAccount(account)
+	err = dataBase.AddAccount(c)
 	if err != nil {
-		t.Fatalf("Ошибка при добавлении аккаунта: %v", err)
+		t.Error(err)
 	}
 
-	// Проверка, что аккаунт был успешно добавлен в базу данных
-	// Проверка, что аккаунт был успешно добавлен в базу данных
-	exists, err := storage.db.Exists(ctx, username).Result()
+	t.Log("Запись создана.")
+}
+
+func TestStorage_SearchAccount(t *testing.T) {
+	// Установка соединения с базой данных RedisDB
+	dataBase, err := New("redis://localhost:6379")
 	if err != nil {
-		t.Fatalf("Ошибка при проверке наличия ключа: %v", err)
+		t.Fatalf("не удалось подключиться к базе данных: %v", err)
 	}
-	if exists == 0 {
-		t.Errorf("Аккаунт не найден в базе данных")
+
+	// Определение тестового аккаунта
+	c := storage.Account{
+		Username: "krex@ya.ru",
+	}
+
+	// Вызов функции SearchAccount
+	password, err := dataBase.SearchAccount(c)
+	if err != nil {
+		t.Errorf("ошибка при поиске аккаунта: %v", err)
+		return
+	}
+
+	// Проверка полученного пароля
+	expectedPassword := "12345678" // Замените на ожидаемый пароль
+	if password != expectedPassword {
+		t.Errorf("неправильный пароль. Получено: %s, Ожидается: %s", password, expectedPassword)
+	}
+}
+
+func TestStorage_KeysAccount(t *testing.T) {
+	// Установка соединения с базой данных RedisDB
+	dataBase, err := New("redis://localhost:6379")
+	if err != nil {
+		t.Fatalf("не удалось подключиться к базе данных: %v", err)
+	}
+
+	// Определение тестового аккаунта
+	c := storage.Account{
+		Username: "krex@ya.ru",
+	}
+
+	// Вызов функции KeysAccount
+	exists, err := dataBase.KeysAccount(c)
+	if err != nil {
+		t.Errorf("ошибка при проверке наличия аккаунта: %v", err)
+		return
+	}
+
+	// Проверка результата наличия аккаунта
+	if exists != true {
+		t.Errorf("неправильный результат проверки наличия аккаунта. Получено: %v, Ожидается: %v", exists, true)
+	}
+}
+
+func TestStorage_DelAccount(t *testing.T) {
+	// Установка соединения с базой данных RedisDB
+	dataBase, err := New("redis://localhost:6379")
+	if err != nil {
+		t.Fatalf("не удалось подключиться к базе данных: %v", err)
+	}
+
+	// Определение тестового аккаунта
+	c := storage.Account{
+		Username: "krex@ya.ru",
+	}
+
+	// Вызов функции DelAccount
+	deleted, err := dataBase.DelAccount(c)
+	if err != nil {
+		t.Errorf("ошибка при удалении аккаунта: %v", err)
+		return
+	}
+
+	// Проверка результата удаления аккаунта
+	if deleted != true {
+		t.Errorf("неправильный результат удаления аккаунта. Получено: %v, Ожидается: %v", deleted, true)
 	}
 }

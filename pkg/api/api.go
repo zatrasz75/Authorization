@@ -183,7 +183,6 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 	fmt.Fprintf(w, "Ваш аккаунт успешно создан.")
-	http.Redirect(w, r, "/login", http.StatusFound)
 
 }
 

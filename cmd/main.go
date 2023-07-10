@@ -4,6 +4,7 @@ import (
 	"authorization/pkg/api"
 	"authorization/pkg/middl"
 	"authorization/pkg/storage"
+	"authorization/pkg/storage/mongoDB"
 	"authorization/pkg/storage/postgres"
 	"authorization/pkg/storage/redisDB"
 	"flag"
@@ -23,7 +24,7 @@ type server struct {
 func init() {
 	// загружает значения из файла .env в систему
 	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
+		log.Print("Файл .env не найден.")
 	}
 }
 
@@ -32,7 +33,8 @@ const (
 	authorizationPort = "4000"
 	authorizationHost = "127.0.0.1"
 	clientRedisDB     = "redis://localhost:6379"
-	clientPostgresDB  = "postgres://postgres:rootroot@localhost:5432/Account"
+	clientPostgresDB  = "postgres://postgres:postgrespw@localhost:49153/Account"
+	clientMongoDB     = "mongodb://localhost:27015/"
 )
 
 func main() {
@@ -52,6 +54,10 @@ func main() {
 	if dbPostgres == "" {
 		dbPostgres = clientPostgresDB
 	}
+	dbMongo := os.Getenv("DB_MONGO_URL")
+	if dbMongo == "" {
+		dbMongo = clientMongoDB
+	}
 
 	// Можно сменить Порт при запуске флагом < --port-authorization= >
 	portFlag := flag.String("port-authorization", port, "Порт для authorization сервиса")
@@ -61,12 +67,15 @@ func main() {
 	redis := flag.String("rdis-url-authorization", dbRedis, "URL для соединения с Redis")
 	// Можно сменить URL соединения с бд при запуске флагом < --postgres-url-authorization= >
 	postgDB := flag.String("postgres-url-authorization", dbPostgres, "URL для соединения с Postgres")
+	// Можно сменить URL соединения с бд при запуске флагом < --mongo-url-authorization= >
+	mongo := flag.String("mongo-url-authorization", dbMongo, "URL для соединения с MongoDB")
 
 	flag.Parse()
 	HOST := *hostFlag
 	PORT := *portFlag
 	REDIS := *redis
 	POSGRES := *postgDB
+	MONGO := *mongo
 
 	// объект сервера
 	var srv server
@@ -80,11 +89,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbM, err := mongoDB.New(MONGO)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	_, _ = dbR, dbP
+	_, _, _ = dbR, dbP, dbM
 
 	// Инициализируем хранилище сервера конкретной БД.
-	srv.db = dbR
+	srv.db = dbM
 
 	if srv.db == dbP {
 		err = dbP.DropAccountsTable()
