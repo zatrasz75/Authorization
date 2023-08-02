@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Пример Регистрации</title>
+</head>
+<body>
+<form>
+    <label for="username">Имя пользователя:</label>
+    <input type="text" id="username" name="username" required><br>
+
+    <label for="password">Пароль:</label>
+    <input type="password" id="password" name="password" required><br>
+
+    <button type="button" onclick="registration()">Зарегистрироваться</button>
+</form>
+
+<div id="registration-response" style="white-space: pre-wrap;"></div> <!-- Уникальный элемент для вывода сообщений о регистрации -->
+
+<script>
+    function registration() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        const data = {
+            username: username,
+            password: password
+        };
+
+        fetch('/registration', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+            .then(response => response.json())
+            .then(data => {
+                // Обработка ответа от сервера
+                const responseDiv = document.getElementById('registration-response');
+                if (data.success) {
+                    responseDiv.textContent = 'Отлично!' + data.message;
+                } else {
+                    responseDiv.textContent = 'Ошибка регистрации:\n' + data.message;
+                    let errorMessages = data.errorMessages.join('\n'); // Преобразуем массив ошибок в одну строку
+                    responseDiv.textContent = 'Ошибка регистрации:\n' + errorMessages;
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+            });
+    }
+</script>
+</body>
+</html>

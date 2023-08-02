@@ -3,12 +3,11 @@ package api
 import (
 	"authorization/pkg/check"
 	"authorization/pkg/storage"
-	"fmt"
+	"encoding/json"
 	"github.com/gorilla/mux"
-	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 )
 
@@ -24,7 +23,7 @@ func New(db storage.Interface) *API {
 		r:  mux.NewRouter(),
 		db: db,
 	}
-	api.r = mux.NewRouter()
+	//	api.r = mux.NewRouter()
 	api.endpoints()
 	return &api
 }
@@ -37,13 +36,37 @@ func (api *API) Router() *mux.Router {
 // Регистрация обработчиков API.
 func (api *API) endpoints() {
 	api.r.HandleFunc("/", api.home).Methods(http.MethodGet)
+	api.r.HandleFunc("/api/login", api.handleLogin).Methods(http.MethodGet)
 	api.r.HandleFunc("/login", api.loginHandler).Methods(http.MethodPost)
 	api.r.HandleFunc("/dashboard", api.dashboardHandler).Methods(http.MethodGet)
 	api.r.HandleFunc("/registration", api.registrationHandler).Methods(http.MethodPost)
 	api.r.HandleFunc("/delaccount", api.delAccountHandler).Methods(http.MethodPost)
-	// веб-приложение
-	api.r.PathPrefix("/").Handler(http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
 
+	// веб-приложение
+	api.r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", http.FileServer(http.Dir("./web/"))))
+
+}
+
+func (api *API) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/api/login" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Чтение содержимого файла login.html
+	content, err := ioutil.ReadFile("web/registration.html")
+	if err != nil {
+		http.Error(w, "Ошибка чтения файла", http.StatusInternalServerError)
+		return
+	}
+
+	// Отправка содержимого файла как ответ
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
 }
 
 func (api *API) home(w http.ResponseWriter, r *http.Request) {
@@ -51,40 +74,35 @@ func (api *API) home(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-
-	// Загрузка и компиляция шаблона
-	tmpl, err := template.ParseFiles("./web/template/index.html")
+	// Чтение содержимого файла login.html
+	content, err := ioutil.ReadFile("web/login.html")
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "Ошибка открытия файла", http.StatusInternalServerError)
+		http.Error(w, "Ошибка чтения файла", http.StatusInternalServerError)
 		return
 	}
 
-	// Определение данных для передачи в шаблон
-	data := struct {
-		Title string
-		Text  string
-	}{
-		Title: "Форма авторизации",
-		Text:  "Привет!",
-	}
-
-	// Рендеринг шаблона с передачей данных
-	err = tmpl.Execute(w, data)
-	if err != nil {
-		http.Error(w, "Ошибка сервера", http.StatusInternalServerError)
-		return
-	}
+	// Отправка содержимого файла как ответ
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
 }
 
 // Функция-обработчик для страницы с регистрацией
 func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/registration" {
 		http.NotFound(w, r)
+		return
 	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+		return
+	}
+
 	// Получаем данные из формы регистрации
-	username := r.FormValue("username")
-	password := r.FormValue("password")
+	var f storage.FormAccount
+	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
+		http.Error(w, "Ошибка при декодировании JSON", http.StatusBadRequest)
+		return
+	}
 
 	// Каналы для синхронизации и передачи результатов проверок
 	emailResultCh := make(chan bool, 1)
@@ -101,32 +119,32 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 	// Горутина для проверки адреса электронной почты
 	go func() {
 		defer wg.Done()
-		emailResultCh <- check.CheckEmail(username)
+		emailResultCh <- check.CheckEmail(f.Username)
 	}()
 	// Горутины для проверки пароля
 	go func() {
 		defer wg.Done()
-		letterCh <- check.LowercaseLetter(password)
+		letterCh <- check.LowercaseLetter(f.Password)
 	}()
 	go func() {
 		defer wg.Done()
-		specCharCh <- check.SpecCharRegex(password)
+		specCharCh <- check.SpecCharRegex(f.Password)
 	}()
 	go func() {
 		defer wg.Done()
-		lenRegexCh <- check.LenPass(password)
+		lenRegexCh <- check.LenPass(f.Password)
 	}()
 	go func() {
 		defer wg.Done()
-		numbersCh <- check.NumbersPass(password)
+		numbersCh <- check.NumbersPass(f.Password)
 	}()
 	go func() {
 		defer wg.Done()
-		containLetterCh <- check.ContainPass(password)
+		containLetterCh <- check.ContainPass(f.Password)
 	}()
 	go func() {
 		defer wg.Done()
-		weakCh <- check.WeakPass(password)
+		weakCh <- check.WeakPass(f.Password)
 	}()
 	wg.Wait()
 
@@ -156,34 +174,55 @@ func (api *API) registrationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Вывод ошибок, если они есть
 	if len(errorMessages) > 0 {
-		errorMsg := strings.Join(errorMessages, "\n")
-		fmt.Fprintf(w, "%s\n", errorMsg)
+		resp := storage.Response{
+			Success:       false,
+			ErrorMessages: errorMessages,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+
 		return
 	}
 
 	// Адрес электронной почты и пароль валидны
-	hash := check.HashPass(password)
+	hash := check.HashPass(f.Password)
 	c := storage.Account{
-		Username: username,
+		Username: f.Username,
 		Password: hash,
 	}
 
-	// Проверяем есть ли такой пользователь в базе redis
+	// Проверяем есть ли такой пользователь в базе данных
 	keys, err := api.db.KeysAccount(c)
 	if err != nil {
 		log.Println(err)
-	}
-	if keys == true {
-		//  Если такой пользователь существует, отображаем сообщение об ошибке.
-		fmt.Fprintf(w, "Такой пользователь уже существует")
+		http.Error(w, "Ошибка при проверке пользователя", http.StatusInternalServerError)
 		return
 	}
-	err = api.db.AddAccount(c)
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Fprintf(w, "Ваш аккаунт успешно создан.")
 
+	if keys == true {
+		resp := storage.Response{
+			Success: false,
+			Message: "Такой пользователь уже существует",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+
+		return
+	} else {
+		err = api.db.AddAccount(c)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Ошибка при добавлении пользователя", http.StatusInternalServerError)
+			return
+		}
+		resp := storage.Response{
+			Success: true,
+			Message: "Ваш аккаунт успешно создан.",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
 }
 
 // Функция-обработчик для страницы с авторизацией
@@ -191,14 +230,16 @@ func (api *API) loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/login" {
 		http.NotFound(w, r)
 	}
-	// Получаем данные из формы регистрации
-	username := r.FormValue("username")
-	password := r.FormValue("password")
+	// Получаем данные из формы авторизации
+	var f storage.FormAccount
+	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
+		http.Error(w, "Ошибка при декодировании JSON", http.StatusBadRequest)
+		return
+	}
 
-	hash := check.HashPass(password)
-
+	hash := check.HashPass(f.Password)
 	c := storage.Account{
-		Username: username,
+		Username: f.Username,
 		Password: hash,
 	}
 
@@ -221,14 +262,18 @@ func (api *API) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 			}
 		}
-		log.Println(session.Name, session.Value, session.Secure)
 		http.SetCookie(w, session)
 
 		// Перенаправляем пользователя на защищенную страницу
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	} else {
 		// Если авторизация не удалась, отображаем сообщение об ошибке
-		fmt.Fprintf(w, "Нет такой записи, проверте логин или пароль")
+		resp := storage.Response{
+			Success: false,
+			Message: "Нет такой записи, проверти логин или пароль",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
 	}
 }
 
@@ -236,6 +281,7 @@ func (api *API) loginHandler(w http.ResponseWriter, r *http.Request) {
 func (api *API) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/dashboard" {
 		http.NotFound(w, r)
+		return
 	}
 	// Проверяем, авторизован ли пользователь
 	session, err := r.Cookie("session")
@@ -245,33 +291,68 @@ func (api *API) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Если пользователь авторизован, отображаем защищенную страницу
-	fmt.Fprintf(w, "Добро пожаловать в панель управления!")
+	// Если пользователь авторизован, отображаем JSON-ответ и содержимое файла dashboard.html
+	resp := storage.Response{
+		Success: true,
+		Message: "Добро пожаловать в панель управления !!!",
+	}
+
+	//tmpl, err := template.ParseFiles("web/ups.html")
+	//if err != nil {
+	//	log.Println("templateОшибка при обработке шаблона:", err)
+	//	http.Error(w, "Ошибка при обработке шаблона", http.StatusInternalServerError)
+	//	return
+	//}
+	//// Устанавливаем правильный Content-Type для HTML
+	//w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	//
+	//err = tmpl.Execute(w, resp)
+	//if err != nil {
+	//	log.Println("Execute Ошибка при выполнении шаблона:", err)
+	//	http.Error(w, "Ошибка при выполнении шаблона", http.StatusInternalServerError)
+	//	return
+	//}
+
+	// Отправляем JSON-ответ
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
+// Функция-обработчик для страницы с удалением аккаунта
 func (api *API) delAccountHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/delaccount" {
 		http.NotFound(w, r)
 	}
-	// Получаем данные из формы регистрации
-	username := r.FormValue("username")
-	//password := r.FormValue("password")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+		return
+	}
 
-	// Получаем логин из формы входа
+	// Получаем данные из формы удаления
+	var f storage.FormAccount
+	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
+		http.Error(w, "Ошибка при декодировании JSON", http.StatusBadRequest)
+		return
+	}
 	c := storage.Account{
-		Username: username,
-		//Password: password,
+		Username: f.Username,
 	}
 
 	// Проверяем есть ли такой пользователь в базе redis
 	keys, err := api.db.KeysAccount(c)
 	if err != nil {
 		log.Println(err)
+		http.Error(w, "Ошибка при проверке пользователя", http.StatusInternalServerError)
+		return
 	}
+
+	// Удаляем аккаунт, если он существует
 	if keys == true {
 		a, err := api.db.DelAccount(c)
 		if err != nil {
 			log.Println(err)
+			http.Error(w, "Ошибка при удалении пользователя", http.StatusInternalServerError)
+			return
 		}
 		if a == true {
 			// Удаляем Cookie
@@ -283,11 +364,20 @@ func (api *API) delAccountHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			http.SetCookie(w, sessionCookie)
 
-			fmt.Fprintf(w, "Ваш аккаунт успешно удален.")
+			resp := storage.Response{
+				Success: true,
+				Message: "Ваш аккаунт успешно удален.",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+			return
 		}
 	}
-	if keys == false {
-		//  Такой пользователь не существует, проверьте логин и пароль.
-		fmt.Fprintf(w, "Такой пользователь не существует, проверьте логин.")
+	// Если аккаунт не существует
+	resp := storage.Response{
+		Success: false,
+		Message: "Такой пользователь не существует, проверьте логин.",
 	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Пример фронтенда</title>
+</head>
+<body>
+<form>
+  <label for="username">Имя пользователя:</label>
+  <input type="text" id="username" name="username" required><br>
+
+  <label for="password">Пароль:</label>
+  <input type="password" id="password" name="password" required><br>
+
+  <button type="button" onclick="login()">Войти</button>
+</form>
+
+<div id="response"></div>
+
+<script>
+  function login() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    const data = {
+      username: username,
+      password: password
+    };
+
+    fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+            .then(response => response.json())
+            .then(data => {
+              // Обработка ответа от сервера
+              const responseDiv = document.getElementById('response');
+              if (data.success) {
+                responseDiv.textContent = 'Успешный вход!';
+              } else {
+                responseDiv.textContent = 'Ошибка входа: ' + data.message;
+              }
+            })
+            .catch(error => {
+              console.error('Ошибка:', error);
+            });
+  }
+</script>
+</body>
+</html>

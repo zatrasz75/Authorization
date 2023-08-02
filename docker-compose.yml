@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: authorization
+    restart: always
+    image: zatrasz/authorization:48
+    build: .
+    environment:
+      APP_HOST: "127.0.0.1"
+      APP_PORT: "5000"
+      DB_POSTGRES_URL: "host=postgres-db user=postgres password=postgrespw dbname=Account sslmode=disable"
+      DB_REDIS_URL: "redis://redis-db:6379/0"
+      DB_MONGO_URL: "mongodb://mongodb-db:27017"
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres-db
+      - redis-db
+      - mongodb-db
+  postgres-db:
+    container_name: postgresql_db
+    restart: always
+    image: postgres:13.3
+    environment:
+      POSTGRES_DB: Account
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespw
+    volumes:
+      - ./authorization_db:/docker-entrypoint-initdb.d
+    ports:
+      - "5555:5432"
+
+  redis-db:
+    container_name: redis_db
+    image: redis:6.2
+    ports:
+      - "6377:6379"
+
+  mongodb-db:
+    container_name: mongo_db
+    image: mongo:4.4
+    ports:
+      - "27025:27017"
+
+volumes:
+  pgdata: {}
+
+
+# docker compose up -d
+
+# docker compose up

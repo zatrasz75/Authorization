@@ -4,34 +4,40 @@ import (
 	"authorization/pkg/api"
 	"authorization/pkg/storage"
 	"authorization/pkg/storage/redisDB"
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 )
 
 func TestRegistrationHandler(t *testing.T) {
 	constr := "redis://localhost:6379"
-	// Создаем тестовую базу данных
+	// Создаём тестовую базу данных
 	db, _ := redisDB.New(constr)
 
-	// Создаем экземпляр API с тестовой базой данных
+	// Создаём экземпляр API с тестовой базой данных
 	a := api.New(db)
 
-	// Создаем данные регистрации
-	formData := url.Values{}
-	formData.Set("username", "ups@mail.ru")
-	formData.Set("password", "Test123!")
+	// Создаём данные регистрации
+	formData := storage.FormAccount{
+		Username: "ups@mail.ru",
+		Password: "Test123!",
+	}
+	jsonData, err := json.Marshal(formData)
+	if err != nil {
+		t.Fatalf("Ошибка при преобразовании данных в JSON: %v", err)
+	}
 
-	// Создаем запрос POST с данными регистрации
-	req, err := http.NewRequest(http.MethodPost, "/registration", strings.NewReader(formData.Encode()))
+	// Создаём запрос POST с данными регистрации
+	req, err := http.NewRequest(http.MethodPost, "/registration", bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatalf("Ошибка при создании запроса: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
 
-	// Создаем ResponseWriter для записи ответа
+	// Создаём ResponseWriter для записи ответа
 	resRecorder := httptest.NewRecorder()
 
 	// Выполняем запрос
@@ -42,11 +48,11 @@ func TestRegistrationHandler(t *testing.T) {
 		t.Errorf("Неверный статус код: получено %v, ожидается %v", resRecorder.Code, http.StatusFound)
 	}
 
-	// Проверяем ожидаемое сообщение
-	expectedMessage := "Ваш аккаунт успешно создан."
-	actualMessage := resRecorder.Body.String()
-	if actualMessage != expectedMessage {
-		t.Errorf("Неверное сообщение: получено %v, ожидается %v", actualMessage, expectedMessage)
+	// Проверяем ожидаемый JSON-ответ
+	expectedJSON := `{"success":true,"message":"Ваш аккаунт успешно создан.","errorMessages":null}`
+	actualJSON := strings.TrimSpace(resRecorder.Body.String())
+	if actualJSON != expectedJSON {
+		t.Errorf("Неверный JSON-ответ: получено\n%s\nожидается\n%s", actualJSON, expectedJSON)
 	}
 
 	// Проверяем, что аккаунт был добавлен в базу данных
@@ -65,25 +71,30 @@ func TestRegistrationHandler(t *testing.T) {
 
 func TestAPI_loginHandler(t *testing.T) {
 	constr := "redis://localhost:6379"
-	// Создаем тестовую базу данных
+	// Создаём тестовую базу данных
 	db, _ := redisDB.New(constr)
 
-	// Создаем экземпляр API с тестовой базой данных
+	// Создаём экземпляр API с тестовой базой данных
 	a := api.New(db)
 
-	// Создаем данные регистрации
-	formData := url.Values{}
-	formData.Set("username", "ups@mail.ru")
-	formData.Set("password", "Test123!")
+	// Создаём данные регистрации
+	formData := storage.FormAccount{
+		Username: "ups@mail.ru",
+		Password: "Test123!",
+	}
+	jsonData, err := json.Marshal(formData)
+	if err != nil {
+		t.Fatalf("Ошибка при преобразовании данных в JSON: %v", err)
+	}
 
-	// Создаем запрос POST с данными регистрации
-	req, err := http.NewRequest(http.MethodPost, "/login", strings.NewReader(formData.Encode()))
+	// Создаём запрос POST с данными регистрации
+	req, err := http.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatalf("Ошибка при создании запроса: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
 
-	// Создаем ResponseWriter для записи ответа
+	// Создаём ResponseWriter для записи ответа
 	resRecorder := httptest.NewRecorder()
 
 	// Выполняем запрос
@@ -98,13 +109,13 @@ func TestAPI_loginHandler(t *testing.T) {
 
 func TestDashboardHandler(t *testing.T) {
 	constr := "redis://localhost:6379"
-	// Создаем тестовую базу данных
+	// Создаём тестовую базу данных
 	db, _ := redisDB.New(constr)
 
-	// Создаем экземпляр API с тестовой базой данных
+	// Создаём экземпляр API с тестовой базой данных
 	a := api.New(db)
 
-	// Создаем запрос GET для защищенной страницы
+	// Создаём запрос GET для защищённой страницы
 	req, err := http.NewRequest(http.MethodGet, "/dashboard", nil)
 	if err != nil {
 		t.Fatalf("Ошибка при создании запроса: %v", err)
@@ -117,7 +128,7 @@ func TestDashboardHandler(t *testing.T) {
 	}
 	req.AddCookie(cookie)
 
-	// Создаем ResponseWriter для записи ответа
+	// Создаём ResponseWriter для записи ответа
 	resRecorder := httptest.NewRecorder()
 
 	// Выполняем запрос
@@ -129,8 +140,8 @@ func TestDashboardHandler(t *testing.T) {
 	}
 
 	// Проверяем ожидаемое сообщение
-	expectedMessage := "Добро пожаловать в панель управления!"
-	actualMessage := resRecorder.Body.String()
+	expectedMessage := `{"success":true,"message":"Добро пожаловать в панель управления !!!","errorMessages":null}`
+	actualMessage := strings.TrimSpace(resRecorder.Body.String())
 	if actualMessage != expectedMessage {
 		t.Errorf("Неверное сообщение: получено %v, ожидается %v", actualMessage, expectedMessage)
 	}
@@ -138,24 +149,29 @@ func TestDashboardHandler(t *testing.T) {
 
 func TestAPI_delAccountHandler(t *testing.T) {
 	constr := "redis://localhost:6379"
-	// Создаем тестовую базу данных
+	// Создаём тестовую базу данных
 	db, _ := redisDB.New(constr)
 
-	// Создаем экземпляр API с тестовой базой данных
+	// Создаём экземпляр API с тестовой базой данных
 	a := api.New(db)
 
-	// Создаем данные регистрации
-	formData := url.Values{}
-	formData.Set("username", "ups@mail.ru")
+	// Создаём аккаунт для удаления
+	formData := storage.FormAccount{
+		Username: "ups@mail.ru",
+	}
+	jsonData, err := json.Marshal(formData)
+	if err != nil {
+		t.Fatalf("Ошибка при преобразовании данных в JSON: %v", err)
+	}
 
-	// Создаем запрос POST с данными регистрации
-	req, err := http.NewRequest(http.MethodPost, "/delaccount", strings.NewReader(formData.Encode()))
+	// Создаём запрос POST с данными удаления
+	req, err := http.NewRequest(http.MethodPost, "/delaccount", bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatalf("Ошибка при создании запроса: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
 
-	// Создаем ResponseWriter для записи ответа
+	// Создаём ResponseWriter для записи ответа
 	resRecorder := httptest.NewRecorder()
 
 	// Выполняем запрос
@@ -166,11 +182,24 @@ func TestAPI_delAccountHandler(t *testing.T) {
 		t.Errorf("Неверный статус код: получено %v, ожидается %v", resRecorder.Code, http.StatusOK)
 	}
 
-	// Проверяем ожидаемое сообщение
-	expectedMessage := "Ваш аккаунт успешно удален."
-	actualMessage := resRecorder.Body.String()
-	if actualMessage != expectedMessage {
-		t.Errorf("Неверное сообщение: получено %v, ожидается %v", actualMessage, expectedMessage)
+	// Проверяем ожидаемый JSON-ответ при успешном удалении
+	expectedResponse := `{"success":true,"message":"Ваш аккаунт успешно удален.","errorMessages":null}`
+	actualResponse := strings.TrimSpace(resRecorder.Body.String())
+	if actualResponse != expectedResponse {
+		t.Errorf("Неверный JSON-ответ: получено %v, ожидается %v", actualResponse, expectedResponse)
 	}
 
+	// Создаём аккаунт для проверки удаления из базы данных
+	c := storage.Account{
+		Username: "testuser",
+	}
+
+	// Проверяем, что аккаунт был удалён из базы данных
+	keys, err := db.KeysAccount(c)
+	if err != nil {
+		t.Fatalf("Ошибка при поиске ключей: %v", err)
+	}
+	if keys {
+		t.Errorf("Аккаунт не должен быть найден в базе данных после удаления")
+	}
 }

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Панель управления</title>
+</head>
+<body>
+<h1>Панель управления</h1>
+<div id="dashboard-data"></div>
+
+<script>
+    // Функция для выполнения запроса к серверу
+    function fetchData() {
+        fetch('/dashboard', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                // Обработка ответа от сервера
+                const dashboardDataDiv = document.getElementById('dashboard-data');
+                if (data.success) {
+                    dashboardDataDiv.textContent = data.message;
+                } else {
+                    dashboardDataDiv.textContent = 'Ошибка: не удалось получить данные.';
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+            });
+    }
+
+    // Вызываем функцию при загрузке страницы
+    fetchData();
+</script>
+</body>
+</html>

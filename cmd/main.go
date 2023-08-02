@@ -7,11 +7,15 @@ import (
 	"authorization/pkg/storage/mongoDB"
 	"authorization/pkg/storage/postgres"
 	"authorization/pkg/storage/redisDB"
+	"context"
 	"flag"
 	"github.com/joho/godotenv"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 // сервер
@@ -30,7 +34,7 @@ func init() {
 
 // Переменные для окружения соединения
 const (
-	authorizationPort = "4000"
+	authorizationPort = "5000"
 	authorizationHost = "127.0.0.1"
 	clientRedisDB     = "redis://localhost:6379"
 	clientPostgresDB  = "postgres://postgres:postgrespw@localhost:49153/Account"
@@ -77,33 +81,37 @@ func main() {
 	POSGRES := *postgDB
 	MONGO := *mongo
 
-	// объект сервера
-	var srv server
-
-	// объект базы данных redis
+	// объект базы данных Redis
 	dbR, err := redisDB.New(REDIS)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("нет соединения с RedisDB %v", err)
 	}
+
+	// объект базы данных PostgreSQL
 	dbP, err := postgres.New(POSGRES)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("нет соединения с PostgreSQL %v", err)
 	}
+
+	// объект базы данных Mongo
 	dbM, err := mongoDB.New(MONGO)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("нет соединения с MongoDB %v", err)
 	}
 
 	_, _, _ = dbR, dbP, dbM
 
-	// Инициализируем хранилище сервера конкретной БД.
-	srv.db = dbM
+	// объект сервера
+	var router server
 
-	if srv.db == dbP {
-		err = dbP.DropAccountsTable()
-		if err != nil {
-			log.Println(err)
-		}
+	// Инициализируем хранилище сервера конкретной БД.
+	router.db = dbP
+
+	if router.db == dbP {
+		//err = dbP.DropAccountsTable()
+		//if err != nil {
+		//	log.Println(err)
+		//}
 
 		err = dbP.CreateAccountsTable()
 		if err != nil {
@@ -112,15 +120,46 @@ func main() {
 	}
 
 	// Создаём объект API и регистрируем обработчики.
-	srv.api = api.New(srv.db)
+	router.api = api.New(router.db)
 
-	srv.api.Router().Use(middl.Middle)
+	router.api.Router().Use(middl.Middle)
 
-	log.Println("Запуск сервера на ", "http://"+HOST+":"+PORT+"/login")
+	log.Println("Запуск сервера на ", "http://"+HOST+":"+PORT)
 
-	err = http.ListenAndServe(HOST+":"+PORT, srv.api.Router())
-	if err != nil {
-		log.Fatal("Не удалось запустить сервер шлюза. Error:", err)
+	// Создаем HTTP сервер с заданным адресом и обработчиком.
+	srv := http.Server{
+		Addr:         ":" + PORT,
+		Handler:      router.api.Router(),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
 	}
 
+	go func() {
+		err = srv.ListenAndServe()
+		if err != nil {
+			log.Fatal("Не удалось запустить сервер шлюза. Error:", err)
+		}
+	}()
+
+	graceShutdown(srv)
+}
+
+// Выключает сервер
+func graceShutdown(srv http.Server) {
+	quitCH := make(chan os.Signal, 1)
+	signal.Notify(quitCH, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-quitCH
+
+	// Создаем контекст с таймаутом 5 секунд.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	// Останавливаем сервер с таймаутом 5 секунд.
+	err := srv.Shutdown(ctx)
+	if err != nil {
+		log.Printf("Ошибка при закрытии прослушивателей или тайм-аут контекста %v", err)
+		return
+	}
+	log.Printf("Выключение сервера")
+	os.Exit(0)
 }
