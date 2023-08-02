@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -62,17 +63,25 @@ func main() {
 	if dbMongo == "" {
 		dbMongo = clientMongoDB
 	}
+	choice := os.Getenv("DEFINITION_DB")
+	if choice == "" {
+		log.Println("Не выбрана база данных ! Redis , Postgres или Mongo")
+		return
+	}
 
 	// Можно сменить Порт при запуске флагом < --port-authorization= >
 	portFlag := flag.String("port-authorization", port, "Порт для authorization сервиса")
 	// Можно сменить Хост при запуске флагом < --host-authorization= >
 	hostFlag := flag.String("host-authorization", host, "Хост для authorization сервиса")
-	// Можно сменить URL соединения с бд при запуске флагом < --rdis-url-authorization= >
-	redis := flag.String("rdis-url-authorization", dbRedis, "URL для соединения с Redis")
+	// Можно сменить URL соединения с бд при запуске флагом < --redis-url-authorization= >
+	redis := flag.String("redis-url-authorization", dbRedis, "URL для соединения с Redis")
 	// Можно сменить URL соединения с бд при запуске флагом < --postgres-url-authorization= >
 	postgDB := flag.String("postgres-url-authorization", dbPostgres, "URL для соединения с Postgres")
 	// Можно сменить URL соединения с бд при запуске флагом < --mongo-url-authorization= >
 	mongo := flag.String("mongo-url-authorization", dbMongo, "URL для соединения с MongoDB")
+
+	// Выбор базы данных Redis , Postgres или Mongo при запуске флагом < --select-db= >
+	selectionDB := flag.String("select-db", choice, "Выбор базы данных Redis , Postgres или Mongo")
 
 	flag.Parse()
 	HOST := *hostFlag
@@ -80,47 +89,62 @@ func main() {
 	REDIS := *redis
 	POSGRES := *postgDB
 	MONGO := *mongo
-
-	// объект базы данных Redis
-	dbR, err := redisDB.New(REDIS)
-	if err != nil {
-		log.Printf("нет соединения с RedisDB %v", err)
-	}
-
-	// объект базы данных PostgreSQL
-	dbP, err := postgres.New(POSGRES)
-	if err != nil {
-		log.Printf("нет соединения с PostgreSQL %v", err)
-	}
-
-	// объект базы данных Mongo
-	dbM, err := mongoDB.New(MONGO)
-	if err != nil {
-		log.Printf("нет соединения с MongoDB %v", err)
-	}
-
-	_, _, _ = dbR, dbP, dbM
+	CHOICE := *selectionDB
 
 	// объект сервера
 	var router server
 
-	// Инициализируем хранилище сервера конкретной БД.
-	router.db = dbP
+	switch CHOICE {
+	case "Redis":
+		// объект базы данных Redis
+		dbR, err := redisDB.New(REDIS)
+		if err != nil {
+			log.Printf("нет соединения с RedisDB %v", err)
+			return
+		}
+		// Инициализируем хранилище сервера конкретной БД.
+		router.db = dbR
+	case "Postgres":
+		// объект базы данных PostgreSQL
+		dbP, err := postgres.New(POSGRES)
+		if err != nil {
+			log.Printf("нет соединения с PostgreSQL %v", err)
+			return
+		}
+		// Инициализируем хранилище сервера конкретной БД.
+		router.db = dbP
 
-	if router.db == dbP {
-		//err = dbP.DropAccountsTable()
+		//err = dbP.DropAccountsTable() // Удаляет таблицу с данными
 		//if err != nil {
 		//	log.Println(err)
 		//}
 
-		err = dbP.CreateAccountsTable()
+		err = dbP.CreateAccountsTable() // Создает таблицу для данных
 		if err != nil {
 			log.Println(err)
 		}
+	case "Mongo":
+		// объект базы данных Mongo
+		dbM, err := mongoDB.New(MONGO)
+		if err != nil {
+			log.Printf("нет соединения с MongoDB %v", err)
+			return
+		}
+		// Инициализируем хранилище сервера конкретной БД.
+		router.db = dbM
 	}
 
+	// Получаем текущий путь к main.go
+	currentDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal("Не удалось получить текущий каталог:", err)
+	}
+
+	// Получаем абсолютный путь к каталогу web/
+	webRoot := filepath.Join(currentDir, "../web")
+
 	// Создаём объект API и регистрируем обработчики.
-	router.api = api.New(router.db)
+	router.api = api.New(router.db, webRoot)
 
 	router.api.Router().Use(middl.Middle)
 
@@ -135,7 +159,7 @@ func main() {
 	}
 
 	go func() {
-		err = srv.ListenAndServe()
+		err := srv.ListenAndServe()
 		if err != nil {
 			log.Fatal("Не удалось запустить сервер шлюза. Error:", err)
 		}

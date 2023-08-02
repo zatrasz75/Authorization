@@ -8,20 +8,24 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
 // API приложения.
 type API struct {
-	r  *mux.Router       // Маршрутизатор запросов
-	db storage.Interface // база данных
+	r       *mux.Router       // Маршрутизатор запросов
+	db      storage.Interface // база данных
+	webRoot string            // Корневая директория для веб-приложения
 }
 
 // New Конструктор API.
-func New(db storage.Interface) *API {
+func New(db storage.Interface, webRoot string) *API {
 	api := API{
-		r:  mux.NewRouter(),
-		db: db,
+		r:       mux.NewRouter(),
+		db:      db,
+		webRoot: webRoot,
 	}
 	//	api.r = mux.NewRouter()
 	api.endpoints()
@@ -45,6 +49,34 @@ func (api *API) endpoints() {
 	// веб-приложение
 	api.r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", http.FileServer(http.Dir("./web/"))))
 
+}
+
+// Обработчик для статических файлов веб-приложения.
+func (api *API) serveWebFiles(w http.ResponseWriter, r *http.Request) {
+	filePath := r.URL.Path
+	// Проверяем, что запрошенный путь начинается с "/web/".
+	if !strings.HasPrefix(filePath, "/web/") {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Проверяем, что путь после "/web/" не содержит "../" (попытка обхода пути).
+	if strings.Contains(filePath, "../") {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Строим абсолютный путь к файлу.
+	absolutePath := filepath.Join(api.webRoot, filePath[5:])
+
+	// Проверяем, что абсолютный путь находится в пределах корневой директории для веб-приложения.
+	if !strings.HasPrefix(absolutePath, api.webRoot) {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Обслуживаем статический файл.
+	http.ServeFile(w, r, absolutePath)
 }
 
 func (api *API) handleLogin(w http.ResponseWriter, r *http.Request) {

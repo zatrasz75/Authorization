@@ -12,6 +12,7 @@ services:
       DB_POSTGRES_URL: "host=postgres-db user=postgres password=postgrespw dbname=Account sslmode=disable"
       DB_REDIS_URL: "redis://redis-db:6379/0"
       DB_MONGO_URL: "mongodb://mongodb-db:27017"
+      DEFINITION_DB: "Postgres"
     ports:
       - "5000:5000"
     depends_on:
