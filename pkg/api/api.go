@@ -329,22 +329,6 @@ func (api *API) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "Добро пожаловать в панель управления !!!",
 	}
 
-	//tmpl, err := template.ParseFiles("web/ups.html")
-	//if err != nil {
-	//	log.Println("templateОшибка при обработке шаблона:", err)
-	//	http.Error(w, "Ошибка при обработке шаблона", http.StatusInternalServerError)
-	//	return
-	//}
-	//// Устанавливаем правильный Content-Type для HTML
-	//w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	//
-	//err = tmpl.Execute(w, resp)
-	//if err != nil {
-	//	log.Println("Execute Ошибка при выполнении шаблона:", err)
-	//	http.Error(w, "Ошибка при выполнении шаблона", http.StatusInternalServerError)
-	//	return
-	//}
-
 	// Отправляем JSON-ответ
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)

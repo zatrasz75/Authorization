@@ -1,7 +1,8 @@
 # Authorization
 
-### запустить приложение с переменными окружения по умолчанию:
-* go run cmd/main.go
+### запустить приложение с переменными окружения по умолчанию и выбором базы данных Redis , Postgres или Mongo:
+#### Пример с Postgres
+* go run cmd/main.go --select-db=Postgres
 
 ### изменить переменные через аргументы командной строки при запуске:
 host
@@ -20,18 +21,19 @@ Mongo URL
 * go run cmd/main.go --mongo-url-authorization= < >
 
 ### Или в файле .env
-* APP_HOST , APP_PORT , DB_REDIS_URL , DB_POSTGRES_URL , DB_MONGO_URL
+* APP_HOST , APP_PORT , DB_REDIS_URL , DB_POSTGRES_URL , DB_MONGO_URL , DEFINITION_DB
 
-### Доступные API для работы с базой данных Redis, примеры:
+### Доступные API для работы с выбранной базой данных , примеры:
 
 Регистрация, метод post (если успешно, перенаправляет авторизоваться)
-* http://localhost:4000/registration
+* http://127.0.0.1:5000/api/login
 
 Авторизация, метод post перенаправляет на защищенную страницу
-* http://localhost:4000/login
+* http://localhost:5000/
 
-Защищенная страница, метод get (если не авторизован, перенаправляет авторизоваться)
-* http://localhost:4000/dashboard
+#### Для Postman
+Защищенная страница, метод get (если не авторизован, возвращает ошибку)
+* http://localhost:5000/dashboard/
 
 Удаление аккаунта, метод post
-* http://localhost:4000/delaccount
+* http://localhost:5000/delaccount
